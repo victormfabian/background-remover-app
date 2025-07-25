@@ -108,11 +108,11 @@ if uploaded_file:
 
     col1, spacer, col2 = st.columns([1.2, 0.1, 1.2])
     with col1:
-        st.image(original_img, caption="🖞️ Original", use_column_width=True)
+        st.image(original_img, caption="🖞️ Original", use_container_width=True)
     with col2:
         preview_bg = Image.new("RGBA", result_img_display.size, background_color)
         preview_bg.paste(result_img_display, (0, 0), mask=result_img_display)
-        st.image(preview_bg, caption=f"🌟 Background Removed ({res_choice})", use_column_width=True)
+        st.image(preview_bg, caption=f"🌟 Background Removed ({res_choice})", use_container_width=True)
 
     output = io.BytesIO()
     result_img_export.save(output, format="PNG")

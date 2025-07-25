@@ -79,7 +79,14 @@ softness = st.slider("🥶 Edge Softness", 0.0, 5.0, 0.0, 0.1)
 contrast_boost = st.checkbox("🌆 Enhance Contrast for Better Edge Detection", value=True)
 sharpen = st.checkbox("🗑️ Sharpen Details After Removal", value=True)
 res_choice = st.selectbox("📏 Export Resolution", list(res_options.keys()), index=0)
-background_color = st.color_picker("🎨 Preview Background Color", value="#ffffff")
+background_mode = st.radio("🎨 Background Option", ["Color", "Image"], horizontal=True)
+
+if background_mode == "Color":
+    background_color = st.color_picker("🎨 Choose Background Color", value="#ffffff")
+    background_image = None
+else:
+    background_image_file = st.file_uploader("🖼️ Upload Background Image", type=["png", "jpg", "jpeg"], key="bg_img")
+    background_image = Image.open(background_image_file).convert("RGBA") if background_image_file else None
 
 if uploaded_file:
     image_bytes = uploaded_file.read()
@@ -110,7 +117,12 @@ if uploaded_file:
     with col1:
         st.image(original_img, caption="🖞️ Original", use_container_width=True)
     with col2:
-        preview_bg = Image.new("RGBA", result_img_display.size, background_color)
+        if background_mode == "Color":
+            preview_bg = Image.new("RGBA", result_img_display.size, background_color)
+        elif background_image:
+            preview_bg = background_image.resize(result_img_display.size).convert("RGBA")
+        else:
+            preview_bg = Image.new("RGBA", result_img_display.size, (255, 255, 255, 0))
         preview_bg.paste(result_img_display, (0, 0), mask=result_img_display)
         st.image(preview_bg, caption=f"🌟 Background Removed ({res_choice})", use_container_width=True)
 

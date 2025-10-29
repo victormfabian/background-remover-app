@@ -1,28 +1,12 @@
-import streamlit as st 
+import streamlit as st
 from rembg import remove, new_session
 from PIL import Image, ImageFilter, ImageEnhance
 import io
 import cv2
 import numpy as np
-import os
-import urllib.request
 
 st.set_page_config(page_title="🧼 Background Remover", layout="wide")
 st.title("🧼 Smart Background Remover")
-
-# -------------------------
-# Persistent local model setup
-# -------------------------
-MODEL_DIR = "models"
-MODEL_FILE = "isnet-general-use.onnx"
-MODEL_PATH = os.path.join(MODEL_DIR, MODEL_FILE)
-os.makedirs(MODEL_DIR, exist_ok=True)
-
-if not os.path.exists(MODEL_PATH):
-    st.info("📥 Downloading model for the first time, please wait...")
-    url = "https://github.com/danielgatis/rembg/releases/download/v0.0.0/isnet-general-use.onnx"
-    urllib.request.urlretrieve(url, MODEL_PATH)
-    st.success("✅ Model downloaded successfully!")
 
 # -------------------------
 # Output resolution choices
@@ -36,7 +20,7 @@ res_options = {
 }
 
 # -------------------------
-# Auto-detect image type for best model
+# Auto-detect model
 # -------------------------
 def detect_best_model(image: Image.Image) -> str:
     np_img = np.array(image.convert("RGB"))
@@ -44,21 +28,18 @@ def detect_best_model(image: Image.Image) -> str:
     gray = cv2.cvtColor(np_img, cv2.COLOR_RGB2GRAY)
     faces = face_cascade.detectMultiScale(gray, 1.1, 4)
 
+    # Use human segmentation if dominant face
     if len(faces) > 0:
         h, w = gray.shape
         x, y, fw, fh = faces[0]
         if fw * fh > 0.1 * w * h:
-            return MODEL_PATH  # Use local model
+            return "u2net_human_seg"
 
-    brightness = np.mean(np_img)
-    contrast = np.std(np_img)
-    if contrast > 50 and brightness < 180:
-        return MODEL_PATH
-
-    return MODEL_PATH
+    # Fallback general model
+    return "isnet-general-use"
 
 # -------------------------
-# Improved edge cleaning with feathering
+# Feathered edge cleaning
 # -------------------------
 def clean_transparency_edges(img, feather_radius=2):
     np_img = np.array(img)
@@ -69,13 +50,12 @@ def clean_transparency_edges(img, feather_radius=2):
     return Image.fromarray(np_img)
 
 # -------------------------
-# Background remover with enhancement
+# Background remover
 # -------------------------
-def remove_background_hd(image_data, hd_size=None, softness=0.0, contrast_boost=False, sharpen=False, session=None):
-    output_image = remove(image_data, session=session)
+def remove_background_hd(image_bytes, hd_size=None, softness=0.0, contrast_boost=False, sharpen=False, session=None):
+    output_image = remove(image_bytes, session=session)
     img = Image.open(io.BytesIO(output_image)).convert("RGBA")
 
-    # Clean edge artifacts with feathering
     img = clean_transparency_edges(img, feather_radius=2)
 
     if contrast_boost:
@@ -93,12 +73,12 @@ def remove_background_hd(image_data, hd_size=None, softness=0.0, contrast_boost=
     return img
 
 # -------------------------
-# Upload and options
+# UI: upload & options
 # -------------------------
 uploaded_file = st.file_uploader("📄 Upload Image", type=["png", "jpg", "jpeg"])
 softness = st.slider("🥶 Edge Softness", 0.0, 5.0, 0.0, 0.1)
-contrast_boost = st.checkbox("🌆 Enhance Contrast for Better Edge Detection", value=True)
-sharpen = st.checkbox("🗑️ Sharpen Details After Removal", value=True)
+contrast_boost = st.checkbox("🌆 Enhance Contrast", value=True)
+sharpen = st.checkbox("🗑️ Sharpen Details", value=True)
 res_choice = st.selectbox("📏 Export Resolution", list(res_options.keys()), index=0)
 background_mode = st.radio("🎨 Background Option", ["Color", "Image"], horizontal=True)
 
@@ -121,9 +101,9 @@ if uploaded_file:
     original_img = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
 
     with st.spinner("🧠 Detecting best model..."):
-        model_choice = detect_best_model(original_img)
-        session = new_session(model_choice)
-    st.success(f"🧼 Model loaded: **{MODEL_FILE}**")
+        model_name = detect_best_model(original_img)
+        session = new_session(model_name)
+    st.success(f"🧼 Model loaded: **{model_name}**")
 
     with st.spinner("🧼 Removing background..."):
         result_img_display = remove_background_hd(
